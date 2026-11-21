@@ -1,4 +1,3 @@
-process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
 require('dotenv').config();
 const https = require('https');
 https.globalAgent.options.rejectUnauthorized = false;
@@ -18,6 +17,7 @@ app.use(express.json());
 app.use('/api/auth', authRoutes);
 
 // Protect the API with JWT Auth
+app.use('/api/sap/prd', jwtAuthMiddleware, sapRoutes);
 app.use('/api/sap/dev', jwtAuthMiddleware, sapRoutes);
 
 // Direct route for production-order-create-release

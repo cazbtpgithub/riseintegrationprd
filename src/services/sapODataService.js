@@ -1,4 +1,3 @@
-process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
 const axios = require('axios');
 const https = require('https');
 const fs = require('fs');
@@ -43,6 +42,7 @@ const loadEnv = () => {
     try {
         const envPath = path.join(__dirname, '../../.env');
         dotenv.config({ path: envPath, override: true });
+        delete process.env.NODE_TLS_REJECT_UNAUTHORIZED;
     } catch (error) {
         console.error('Error loading .env file:', error.message);
     }
@@ -52,16 +52,22 @@ const loadEnv = () => {
 const getSapAuth = () => {
     loadEnv();
     return {
-        username: process.env.SAP_USER,
-        password: process.env.SAP_PASSWORD
+        username: (process.env.SAP_USER || 'HYD_MES').trim(),
+        password: (process.env.SAP_PASSWORD || 'Password@123456').trim()
     };
 };
 
 // Base URL host for the SAP service (Reads from .env: SAP_HOST)
 const getSapBaseUrl = () => {
     loadEnv();
-    const host = (process.env.SAP_HOST || 'https://vhwclds4ap01.sap.wco.com:44300').trim();
-    return host.replace('http://vhwclds4ap01.sap.wco.com:8000', 'https://vhwclds4ap01.sap.wco.com:44300');
+    const host = (process.env.SAP_HOST || 'https://vhwclps4ap01.sap.wco.com:44300').trim();
+    return host.replace('http://vhwclps4ap01.sap.wco.com:8000', 'https://vhwclps4ap01.sap.wco.com:44300');
+};
+
+// SAP Client number (Reads from .env: SAP_CLIENT, defaults to 100 for PRD)
+const getSapClient = () => {
+    loadEnv();
+    return (process.env.SAP_CLIENT || '100').trim();
 };
 
 // Base URL for the SAP OData service
@@ -187,7 +193,7 @@ const getMaterialStock = async (params) => {
         const inventoryStockType = params.InventoryStockType || '';
         
         const filterStr = `$filter=Material eq '${material}' and Plant eq '${plant}' and Customer eq '${customer}' and Supplier eq '${supplier}' and InventoryStockType eq '${inventoryStockType}'`;
-        const url = `${getSapBaseUrl()}/sap/opu/odata/sap/API_MATERIAL_STOCK_SRV/A_MatlStkInAcctMod?${filterStr}&$format=json&sap-client=110`;
+        const url = `${getSapBaseUrl()}/sap/opu/odata/sap/API_MATERIAL_STOCK_SRV/A_MatlStkInAcctMod?${filterStr}&$format=json&sap-client=${getSapClient()}`;
         const response = await axios.get(url, {
             auth: getSapAuth(),
             headers: {
@@ -242,7 +248,7 @@ const getInspectionResultValue = async (params) => {
         const inspectionCharacteristic = params.InspectionCharacteristic || '';
         const inspResultValueInternalID = params.InspResultValueInternalID || '';
         
-        const url = `${getSapBaseUrl()}/sap/opu/odata/sap/API_INSPECTIONLOT_SRV/A_InspectionResultValue(InspectionLot='${inspectionLot}',InspPlanOperationInternalID='${inspPlanOperationInternalID}',InspectionCharacteristic='${inspectionCharacteristic}',InspResultValueInternalID='${inspResultValueInternalID}')?$format=json&sap-client=110`;
+        const url = `${getSapBaseUrl()}/sap/opu/odata/sap/API_INSPECTIONLOT_SRV/A_InspectionResultValue(InspectionLot='${inspectionLot}',InspPlanOperationInternalID='${inspPlanOperationInternalID}',InspectionCharacteristic='${inspectionCharacteristic}',InspResultValueInternalID='${inspResultValueInternalID}')?$format=json&sap-client=${getSapClient()}`;
         
         const response = await axios.get(url, {
             auth: getSapAuth(),
@@ -269,7 +275,7 @@ const getInspectionResultValue = async (params) => {
  */
 const fetchMaterialDocumentCsrfToken = async () => {
     try {
-        const url = `${getSapBaseUrl()}/sap/opu/odata/sap/API_MATERIAL_DOCUMENT_SRV/?sap-client=110`;
+        const url = `${getSapBaseUrl()}/sap/opu/odata/sap/API_MATERIAL_DOCUMENT_SRV/?sap-client=${getSapClient()}`;
         const response = await axios.get(url, {
             auth: getSapAuth(),
             headers: {
@@ -297,7 +303,7 @@ const postMaterialDocumentHeader = async (payload) => {
             throw new Error('No CSRF token returned from SAP');
         }
 
-        const url = `${getSapBaseUrl()}/sap/opu/odata/sap/API_MATERIAL_DOCUMENT_SRV/A_MaterialDocumentHeader?sap-client=110`;
+        const url = `${getSapBaseUrl()}/sap/opu/odata/sap/API_MATERIAL_DOCUMENT_SRV/A_MaterialDocumentHeader?sap-client=${getSapClient()}`;
         const response = await axios.post(url, payload, {
             auth: getSapAuth(),
             headers: {
@@ -352,7 +358,7 @@ const cancelMaterialDocument = async (params) => {
         const materialDocumentYear = params.MaterialDocumentYear || '';
         const materialDocument = params.MaterialDocument || '';
 
-        const url = `${getSapBaseUrl()}/sap/opu/odata/sap/API_MATERIAL_DOCUMENT_SRV/Cancel?MaterialDocumentYear='${materialDocumentYear}'&MaterialDocument='${materialDocument}'&sap-client=110`;
+        const url = `${getSapBaseUrl()}/sap/opu/odata/sap/API_MATERIAL_DOCUMENT_SRV/Cancel?MaterialDocumentYear='${materialDocumentYear}'&MaterialDocument='${materialDocument}'&sap-client=${getSapClient()}`;
         const response = await axios.post(url, {}, { // Sending empty body for function import
             auth: getSapAuth(),
             headers: {
@@ -379,7 +385,7 @@ const cancelMaterialDocument = async (params) => {
  */
 const fetchInspectionResultRecordCsrfToken = async () => {
     try {
-        const url = `${getSapBaseUrl()}/sap/opu/odata/sap/ZQM_QA32_CHAR_CHANGE_SRV/?sap-client=110`;
+        const url = `${getSapBaseUrl()}/sap/opu/odata/sap/ZQM_QA32_CHAR_CHANGE_SRV/?sap-client=${getSapClient()}`;
         const response = await axios.get(url, {
             auth: getSapAuth(),
             headers: {
@@ -406,7 +412,7 @@ const postInspectionResultRecord = async (payload) => {
             throw new Error('No CSRF token returned from SAP');
         }
 
-        const url = `${getSapBaseUrl()}/sap/opu/odata/sap/ZQM_QA32_CHAR_CHANGE_SRV/HeaderentitySet?sap-client=110`;
+        const url = `${getSapBaseUrl()}/sap/opu/odata/sap/ZQM_QA32_CHAR_CHANGE_SRV/HeaderentitySet?sap-client=${getSapClient()}`;
         const response = await axios.post(url, payload, {
             auth: getSapAuth(),
             headers: {
@@ -433,7 +439,7 @@ const postInspectionResultRecord = async (payload) => {
  */
 const fetchInspectionLotCsrfToken = async () => {
     try {
-        const url = `${getSapBaseUrl()}/sap/opu/odata/sap/ZQM_INSP_LOT_UD_SRV/?sap-client=110`;
+        const url = `${getSapBaseUrl()}/sap/opu/odata/sap/ZQM_INSP_LOT_UD_SRV/?sap-client=${getSapClient()}`;
         const response = await axios.get(url, {
             auth: getSapAuth(),
             headers: {
@@ -460,7 +466,7 @@ const postInspectionLot = async (payload) => {
             throw new Error('No CSRF token returned from SAP');
         }
 
-        const url = `${getSapBaseUrl()}/sap/opu/odata/sap/ZQM_INSP_LOT_UD_SRV/UsagedecisionSet?sap-client=110`;
+        const url = `${getSapBaseUrl()}/sap/opu/odata/sap/ZQM_INSP_LOT_UD_SRV/UsagedecisionSet?sap-client=${getSapClient()}`;
         const response = await axios.post(url, payload, {
             auth: getSapAuth(),
             headers: {
@@ -487,7 +493,7 @@ const postInspectionLot = async (payload) => {
  */
 const fetchApiInspectionLotCsrfToken = async () => {
     try {
-        const url = `${getSapBaseUrl()}/sap/opu/odata/sap/API_INSPECTIONLOT_SRV/?sap-client=110`;
+        const url = `${getSapBaseUrl()}/sap/opu/odata/sap/API_INSPECTIONLOT_SRV/?sap-client=${getSapClient()}`;
         const response = await axios.get(url, {
             auth: getSapAuth(),
             headers: {
@@ -511,7 +517,7 @@ const getInspectionLotHeader = async (inspectionLot) => {
     try {
         const lotNumber = String(inspectionLot).trim();
         const formattedLot = /^\d+$/.test(lotNumber) ? lotNumber.padStart(12, '0') : lotNumber;
-        const url = `${getSapBaseUrl()}/sap/opu/odata/sap/API_INSPECTIONLOT_SRV/A_InspectionLot('${formattedLot}')?sap-client=110&$select=InspectionLot,ChangedDateTime&$format=json`;
+        const url = `${getSapBaseUrl()}/sap/opu/odata/sap/API_INSPECTIONLOT_SRV/A_InspectionLot('${formattedLot}')?sap-client=${getSapClient()}&$select=InspectionLot,ChangedDateTime&$format=json`;
 
         const response = await axios.get(url, {
             auth: getSapAuth(),
@@ -590,7 +596,7 @@ const postInspectionLot_01 = async (payload) => {
         }
 
         // 3. Post to SAP A_InspLotMatlDocItem
-        const postUrl = `${getSapBaseUrl()}/sap/opu/odata/sap/API_INSPECTIONLOT_SRV/A_InspLotMatlDocItem?sap-client=110`;
+        const postUrl = `${getSapBaseUrl()}/sap/opu/odata/sap/API_INSPECTIONLOT_SRV/A_InspLotMatlDocItem?sap-client=${getSapClient()}`;
         const response = await axios.post(postUrl, postPayload, {
             auth: getSapAuth(),
             headers: {
@@ -616,7 +622,7 @@ const postInspectionLot_01 = async (payload) => {
  */
 const fetchProdOrderConfCancelCsrfToken = async () => {
     try {
-        const url = `${getSapBaseUrl()}/sap/opu/odata/sap/API_PROD_ORDER_CONFIRMATION_2_SRV/?sap-client=110`;
+        const url = `${getSapBaseUrl()}/sap/opu/odata/sap/API_PROD_ORDER_CONFIRMATION_2_SRV/?sap-client=${getSapClient()}`;
         const response = await axios.get(url, {
             auth: getSapAuth(),
             headers: {
@@ -654,9 +660,9 @@ const CancelProdnOrdConf = async (params) => {
         
         let url = `${getSapBaseUrl()}/sap/opu/odata/sap/API_PROD_ORDER_CONFIRMATION_2_SRV/CancelProdnOrdConf`;
         if (queryParams) {
-            url += `?${queryParams}&sap-client=110`;
+            url += `?${queryParams}&sap-client=${getSapClient()}`;
         } else {
-            url += `?sap-client=110`;
+            url += `?sap-client=${getSapClient()}`;
         }
 
         const response = await axios.post(url, {}, { // Sending empty body, payload in endpoint
@@ -699,9 +705,9 @@ const productionOrderConfirmationCancel = async (params) => {
         
         let url = `${getSapBaseUrl()}/sap/opu/odata/sap/API_PROD_ORDER_CONFIRMATION_2_SRV/CancelProdnOrdConf`;
         if (queryParams) {
-            url += `?${queryParams}&sap-client=110`;
+            url += `?${queryParams}&sap-client=${getSapClient()}`;
         } else {
-            url += `?sap-client=110`;
+            url += `?sap-client=${getSapClient()}`;
         }
 
         const response = await axios.post(url, params, {
@@ -729,7 +735,7 @@ const productionOrderConfirmationCancel = async (params) => {
  */
 const fetchPrdOrderConfirmationCsrfToken = async () => {
     try {
-        const url = `${getSapBaseUrl()}/sap/opu/odata/sap/API_PROD_ORDER_CONFIRMATION_2_SRV/?sap-client=110`;
+        const url = `${getSapBaseUrl()}/sap/opu/odata/sap/API_PROD_ORDER_CONFIRMATION_2_SRV/?sap-client=${getSapClient()}`;
         const response = await axios.get(url, {
             auth: getSapAuth(),
             headers: {
@@ -756,7 +762,7 @@ const postPrdOrderConfirmation = async (payload) => {
             throw new Error('No CSRF token returned from SAP');
         }
 
-        const url = `${getSapBaseUrl()}/sap/opu/odata/sap/ZPP_PROD_CONFI_API_SRV/HeaderentitySet?sap-client=110`;
+        const url = `${getSapBaseUrl()}/sap/opu/odata/sap/ZPP_PROD_CONFI_API_SRV/HeaderentitySet?sap-client=${getSapClient()}`;
         const response = await axios.post(url, payload, {
             auth: getSapAuth(),
             headers: {
@@ -798,7 +804,7 @@ const getProductionOrderDetails = async (params) => {
             filterStr = `$filter=${filters.join(' and ')}&`;
         }
 
-        const url = `${getSapBaseUrl()}/sap/opu/odata/sap/API_PRODUCTION_ORDER_2_SRV/A_ProductionOrder_2?${filterStr}$expand=to_ProductionOrderComponent,to_ProductionOrderOperation&sap-client=110&$format=json`;
+        const url = `${getSapBaseUrl()}/sap/opu/odata/sap/API_PRODUCTION_ORDER_2_SRV/A_ProductionOrder_2?${filterStr}$expand=to_ProductionOrderComponent,to_ProductionOrderOperation&sap-client=${getSapClient()}&$format=json`;
 
         const response = await axios.get(url, {
             auth: getSapAuth(),
@@ -897,7 +903,7 @@ const getMaterialList = async (params = {}) => {
             filterQuery = `$filter=${filters.join(' and ')}&`;
         }
 
-        const sapClient = params.sapClient || params['sap-client'] || '110';
+        const sapClient = params.sapClient || params['sap-client'] || getSapClient();
         const url = `${getSapBaseUrl()}/sap/opu/odata/sap/ZMM_MATERIAL_DETAILS_SRV/MaterialSet?${filterQuery}sap-client=${sapClient}&$format=json`;
 
         console.log(`[getMaterialList] Calling SAP OData URL: ${url}`);
@@ -936,7 +942,7 @@ const getMaterialList = async (params = {}) => {
  */
 const getMaterialDocInspLot = async (mblnr, gjahr) => {
     try {
-        const sapClient = '110';
+        const sapClient = getSapClient();
         const url = `${getSapBaseUrl()}/sap/opu/odata/sap/ZMM_INSP_LOT_SRV/MaterialdocSet(Mblnr='${mblnr}',Gjahr='${gjahr}')?sap-client=${sapClient}&$format=json`;
 
         console.log(`[getMaterialDocInspLot] Calling SAP OData URL: ${url}`);
@@ -974,7 +980,7 @@ const getMaterialDocInspLot = async (mblnr, gjahr) => {
  */
 const fetchProductionOrderCsrfToken = async () => {
     try {
-        const url = `${getSapBaseUrl()}/sap/opu/odata/sap/API_PRODUCTION_ORDER_2_SRV?sap-client=110`;
+        const url = `${getSapBaseUrl()}/sap/opu/odata/sap/API_PRODUCTION_ORDER_2_SRV?sap-client=${getSapClient()}`;
         const response = await axios.get(url, {
             auth: getSapAuth(),
             headers: {
@@ -995,12 +1001,12 @@ const fetchProductionOrderCsrfToken = async () => {
 /**
  * Service to Create a Production Order and Release it.
  * Flow:
- * 1. GET CSRF token and session cookies from API_PRODUCTION_ORDER_2_SRV?sap-client=110
- * 2. POST to A_ProductionOrder_2?sap-client=110 with payload
+ * 1. GET CSRF token and session cookies from API_PRODUCTION_ORDER_2_SRV?sap-client=${getSapClient()}
+ * 2. POST to A_ProductionOrder_2?sap-client=${getSapClient()} with payload
  * 3. Extract ManufacturingOrder from response
  * 4. Wait 1 second (1000ms)
- * 5. GET A_ProductionOrder_2('{ManufacturingOrder}')?sap-client=110 to get ETag and CSRF token
- * 6. POST ReleaseOrder?ManufacturingOrder='{ManufacturingOrder}'&sap-client=110 with ETag & token
+ * 5. GET A_ProductionOrder_2('{ManufacturingOrder}')?sap-client=${getSapClient()} to get ETag and CSRF token
+ * 6. POST ReleaseOrder?ManufacturingOrder='{ManufacturingOrder}'&sap-client=${getSapClient()} with ETag & token
  * 7. Return the response
  */
 const productionOrderCreateRelease = async (payload = {}) => {
@@ -1024,7 +1030,7 @@ const productionOrderCreateRelease = async (payload = {}) => {
             ...payload
         };
 
-        const createUrl = `${getSapBaseUrl()}/sap/opu/odata/sap/API_PRODUCTION_ORDER_2_SRV/A_ProductionOrder_2?sap-client=110`;
+        const createUrl = `${getSapBaseUrl()}/sap/opu/odata/sap/API_PRODUCTION_ORDER_2_SRV/A_ProductionOrder_2?sap-client=${getSapClient()}`;
         const createResponse = await axios.post(createUrl, createPayload, {
             auth: getSapAuth(),
             headers: {
@@ -1052,7 +1058,7 @@ const productionOrderCreateRelease = async (payload = {}) => {
         await new Promise(resolve => setTimeout(resolve, 1000));
 
         // Step 4: GET production order details to fetch ETag and Token
-        const getOrderUrl = `${getSapBaseUrl()}/sap/opu/odata/sap/API_PRODUCTION_ORDER_2_SRV/A_ProductionOrder_2('${manufacturingOrder}')?sap-client=110`;
+        const getOrderUrl = `${getSapBaseUrl()}/sap/opu/odata/sap/API_PRODUCTION_ORDER_2_SRV/A_ProductionOrder_2('${manufacturingOrder}')?sap-client=${getSapClient()}`;
         const getOrderResponse = await axios.get(getOrderUrl, {
             auth: getSapAuth(),
             headers: {
@@ -1069,7 +1075,7 @@ const productionOrderCreateRelease = async (payload = {}) => {
         }
 
         // Step 5: Post to ReleaseOrder FunctionImport
-        const releaseUrl = `${getSapBaseUrl()}/sap/opu/odata/sap/API_PRODUCTION_ORDER_2_SRV/ReleaseOrder?ManufacturingOrder='${manufacturingOrder}'&sap-client=110`;
+        const releaseUrl = `${getSapBaseUrl()}/sap/opu/odata/sap/API_PRODUCTION_ORDER_2_SRV/ReleaseOrder?ManufacturingOrder='${manufacturingOrder}'&sap-client=${getSapClient()}`;
         const releaseHeaders = {
             'X-CSRF-Token': releaseToken,
             'Cookie': currentCookies.length > 0 ? (Array.isArray(currentCookies) ? currentCookies.join('; ') : currentCookies) : '',
@@ -1102,9 +1108,9 @@ const productionOrderCreateRelease = async (payload = {}) => {
 /**
  * Service to change Production Order Quantity via PATCH.
  * Flow:
- * 1. GET CSRF token and cookies from API_PRODUCTION_ORDER_2_SRV/?sap-client=110
- * 2. GET A_ProductionOrder_2('{ManufacturingOrder}')?sap-client=110 to get ETag and CSRF token
- * 3. PATCH A_ProductionOrder_2('{ManufacturingOrder}')?sap-client=110 with TotalQuantity and If-Match: etag
+ * 1. GET CSRF token and cookies from API_PRODUCTION_ORDER_2_SRV/?sap-client=${getSapClient()}
+ * 2. GET A_ProductionOrder_2('{ManufacturingOrder}')?sap-client=${getSapClient()} to get ETag and CSRF token
+ * 3. PATCH A_ProductionOrder_2('{ManufacturingOrder}')?sap-client=${getSapClient()} with TotalQuantity and If-Match: etag
  * 4. Return result
  */
 const productionOrderQtyChange = async (params = {}) => {
@@ -1137,7 +1143,7 @@ const productionOrderQtyChange = async (params = {}) => {
         let currentCookies = initialCookies || [];
 
         // Step 2: GET order to retrieve ETag and token
-        const getOrderUrl = `${getSapBaseUrl()}/sap/opu/odata/sap/API_PRODUCTION_ORDER_2_SRV/A_ProductionOrder_2('${manufacturingOrder}')?sap-client=110`;
+        const getOrderUrl = `${getSapBaseUrl()}/sap/opu/odata/sap/API_PRODUCTION_ORDER_2_SRV/A_ProductionOrder_2('${manufacturingOrder}')?sap-client=${getSapClient()}`;
         const getOrderResponse = await axios.get(getOrderUrl, {
             auth: getSapAuth(),
             headers: {
@@ -1156,7 +1162,7 @@ const productionOrderQtyChange = async (params = {}) => {
         const currentQty = getOrderResponse.data?.d?.TotalQuantity;
 
         // Step 3: PATCH TotalQuantity
-        const patchUrl = `${getSapBaseUrl()}/sap/opu/odata/sap/API_PRODUCTION_ORDER_2_SRV/A_ProductionOrder_2('${manufacturingOrder}')?sap-client=110`;
+        const patchUrl = `${getSapBaseUrl()}/sap/opu/odata/sap/API_PRODUCTION_ORDER_2_SRV/A_ProductionOrder_2('${manufacturingOrder}')?sap-client=${getSapClient()}`;
         const patchPayload = {
             TotalQuantity: totalQuantity
         };
@@ -1201,8 +1207,8 @@ const productionOrderQtyChange = async (params = {}) => {
  * Service to Technically Complete (TECO) a Production Order.
  * Flow:
  * 1. Fetch CSRF token and session cookies from API_PRODUCTION_ORDER_2_SRV
- * 2. GET A_ProductionOrder_2('{ManufacturingOrder}')?sap-client=110 to retrieve ETag and CSRF token
- * 3. POST to TechlyCmpltOrder?ManufacturingOrder='{ManufacturingOrder}'&sap-client=110 with ETag & CSRF token
+ * 2. GET A_ProductionOrder_2('{ManufacturingOrder}')?sap-client=${getSapClient()} to retrieve ETag and CSRF token
+ * 3. POST to TechlyCmpltOrder?ManufacturingOrder='{ManufacturingOrder}'&sap-client=${getSapClient()} with ETag & CSRF token
  * 4. Return result
  */
 const productionOrderTeco = async (params = {}) => {
@@ -1233,7 +1239,7 @@ const productionOrderTeco = async (params = {}) => {
         let currentCookies = [];
 
         try {
-            const tokenUrl = `${baseUrl}/sap/opu/odata/sap/API_PRODUCTION_ORDER_2_SRV?sap-client=110`;
+            const tokenUrl = `${baseUrl}/sap/opu/odata/sap/API_PRODUCTION_ORDER_2_SRV?sap-client=${getSapClient()}`;
             const tokenResponse = await axios.get(tokenUrl, {
                 auth,
                 headers: {
@@ -1250,7 +1256,7 @@ const productionOrderTeco = async (params = {}) => {
         }
 
         // Step 2: GET order to retrieve ETag, CSRF token, and current cookies
-        const getOrderUrl = `${baseUrl}/sap/opu/odata/sap/API_PRODUCTION_ORDER_2_SRV/A_ProductionOrder_2('${manufacturingOrder}')?sap-client=110`;
+        const getOrderUrl = `${baseUrl}/sap/opu/odata/sap/API_PRODUCTION_ORDER_2_SRV/A_ProductionOrder_2('${manufacturingOrder}')?sap-client=${getSapClient()}`;
         const getHeaders = {
             'X-CSRF-Token': 'Fetch',
             'Accept': 'application/json'
@@ -1273,7 +1279,7 @@ const productionOrderTeco = async (params = {}) => {
         const orderDetails = getOrderResponse.data?.d || getOrderResponse.data;
 
         // Step 3: POST to TechlyCmpltOrder FunctionImport
-        const tecoUrl = `${baseUrl}/sap/opu/odata/sap/API_PRODUCTION_ORDER_2_SRV/TechlyCmpltOrder?ManufacturingOrder='${manufacturingOrder}'&sap-client=110`;
+        const tecoUrl = `${baseUrl}/sap/opu/odata/sap/API_PRODUCTION_ORDER_2_SRV/TechlyCmpltOrder?ManufacturingOrder='${manufacturingOrder}'&sap-client=${getSapClient()}`;
         const tecoHeaders = {
             'X-CSRF-Token': postToken,
             'Content-Type': 'application/json',
@@ -1318,13 +1324,13 @@ const productionOrderTeco = async (params = {}) => {
 
 /**
  * GET CSRF token and service metadata for UD Reversal service (ZPP_INSP_CANCEL_SRV_SRV).
- * GET https://vhwclds4ap01.sap.wco.com:44300/sap/opu/odata/sap/ZPP_INSP_CANCEL_SRV_SRV/?sap-client=110
+ * GET https://vhwclps4ap01.sap.wco.com:44300/sap/opu/odata/sap/ZPP_INSP_CANCEL_SRV_SRV/?sap-client=${getSapClient()}
  */
 const getUdReversalToken = async (params = {}) => {
     try {
         const auth = getSapAuth();
         const baseUrl = getSapBaseUrl();
-        const url = `${baseUrl}/sap/opu/odata/sap/ZPP_INSP_CANCEL_SRV_SRV/?sap-client=110`;
+        const url = `${baseUrl}/sap/opu/odata/sap/ZPP_INSP_CANCEL_SRV_SRV/?sap-client=${getSapClient()}`;
         const response = await axios.get(url, {
             auth,
             headers: {
@@ -1363,8 +1369,8 @@ const fetchUdReversalCsrfToken = async (baseUrl, auth) => {
 /**
  * Service to process Usage Decision (UD) Reversal via ZPP_INSP_CANCEL_SRV_SRV.
  * Flow:
- * 1. GET CSRF token and cookies from /sap/opu/odata/sap/ZPP_INSP_CANCEL_SRV_SRV/?sap-client=110
- * 2. POST to /sap/opu/odata/sap/ZPP_INSP_CANCEL_SRV_SRV/zinspection_lotSet?sap-client=110 with payload & CSRF token
+ * 1. GET CSRF token and cookies from /sap/opu/odata/sap/ZPP_INSP_CANCEL_SRV_SRV/?sap-client=${getSapClient()}
+ * 2. POST to /sap/opu/odata/sap/ZPP_INSP_CANCEL_SRV_SRV/zinspection_lotSet?sap-client=${getSapClient()} with payload & CSRF token
  * 3. Return created entity data
  */
 const postUdReversal = async (params = {}, customHeaders = {}) => {
@@ -1415,7 +1421,7 @@ const postUdReversal = async (params = {}, customHeaders = {}) => {
         };
 
         // Step 2: Post to zinspection_lotSet
-        const postUrl = `${baseUrl}/sap/opu/odata/sap/ZPP_INSP_CANCEL_SRV_SRV/zinspection_lotSet?sap-client=110`;
+        const postUrl = `${baseUrl}/sap/opu/odata/sap/ZPP_INSP_CANCEL_SRV_SRV/zinspection_lotSet?sap-client=${getSapClient()}`;
         const postHeaders = {
             'X-CSRF-Token': csrfToken,
             'Content-Type': 'application/json',
@@ -1459,13 +1465,13 @@ const udReversal = postUdReversal;
 
 /**
  * GET CSRF token and service metadata for Posting Period Check service (ZPOSTING_PERIOD_CHECK_SRV).
- * GET https://vhwclds4ap01.sap.wco.com:44300/sap/opu/odata/sap/ZPOSTING_PERIOD_CHECK_SRV/?sap-client=110
+ * GET https://vhwclps4ap01.sap.wco.com:44300/sap/opu/odata/sap/ZPOSTING_PERIOD_CHECK_SRV/?sap-client=${getSapClient()}
  */
 const getPostingPeriodCheckToken = async (params = {}) => {
     try {
         const auth = getSapAuth();
         const baseUrl = getSapBaseUrl();
-        const url = `${baseUrl}/sap/opu/odata/sap/ZPOSTING_PERIOD_CHECK_SRV/?sap-client=110`;
+        const url = `${baseUrl}/sap/opu/odata/sap/ZPOSTING_PERIOD_CHECK_SRV/?sap-client=${getSapClient()}`;
         const response = await axios.get(url, {
             auth,
             headers: {
@@ -1504,8 +1510,8 @@ const fetchPostingPeriodCheckCsrfToken = async (baseUrl, auth) => {
 /**
  * Service to process Posting Period Check via ZPOSTING_PERIOD_CHECK_SRV.
  * Flow:
- * 1. GET CSRF token and cookies from /sap/opu/odata/sap/ZPOSTING_PERIOD_CHECK_SRV/?sap-client=110
- * 2. POST to /sap/opu/odata/sap/ZPOSTING_PERIOD_CHECK_SRV/zperiod_checkSet?sap-client=110 with payload & CSRF token
+ * 1. GET CSRF token and cookies from /sap/opu/odata/sap/ZPOSTING_PERIOD_CHECK_SRV/?sap-client=${getSapClient()}
+ * 2. POST to /sap/opu/odata/sap/ZPOSTING_PERIOD_CHECK_SRV/zperiod_checkSet?sap-client=${getSapClient()} with payload & CSRF token
  * 3. Return created entity data
  */
 const checkPostingPeriod = async (params = {}, customHeaders = {}) => {
@@ -1553,7 +1559,7 @@ const checkPostingPeriod = async (params = {}, customHeaders = {}) => {
         };
 
         // Step 2: Post to zperiod_checkSet
-        const postUrl = `${baseUrl}/sap/opu/odata/sap/ZPOSTING_PERIOD_CHECK_SRV/zperiod_checkSet?sap-client=110`;
+        const postUrl = `${baseUrl}/sap/opu/odata/sap/ZPOSTING_PERIOD_CHECK_SRV/zperiod_checkSet?sap-client=${getSapClient()}`;
         const postHeaders = {
             'X-CSRF-Token': csrfToken,
             'Content-Type': 'application/json',

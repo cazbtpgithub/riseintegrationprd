@@ -1,5 +1,5 @@
 {
-  "name": "rise-integration",
+  "name": "rise-integration-prd",
   "version": "1.0.0",
   "description": "API integration with S/4HANA SAP system using OData",
   "main": "src/index.js",
